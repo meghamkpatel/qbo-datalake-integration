@@ -1,0 +1,3097 @@
+{
+    "name": "Specialized Full Load V2",
+    "properties": {
+        "activities": [
+            {
+                "name": "Web1",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "Set variable2",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "method": "POST",
+                    "headers": {
+                        "Authorization": {
+                            "value": "Basic @{base64(concat(variables('clientId'), ':', variables('ClientSecret')))}\n",
+                            "type": "Expression"
+                        },
+                        "Content-type": "application/x-www-form-urlencoded"
+                    },
+                    "linkedServices": [
+                        {
+                            "referenceName": "QBOkey",
+                            "type": "LinkedServiceReference"
+                        }
+                    ],
+                    "url": "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+                    "connectVia": {
+                        "referenceName": "AutoResolveIntegrationRuntime",
+                        "type": "IntegrationRuntimeReference"
+                    },
+                    "body": {
+                        "value": "@concat('grant_type=refresh_token&refresh_token=', activity('Get Refresh Token').output.value)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Set variable1",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Get Refresh Token",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "refreshtoken",
+                    "value": {
+                        "value": "@activity('Get Refresh Token').output.value",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Get Refresh Token",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "Set variable3",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "method": "GET",
+                    "url": "https://qbodatavault.vault.azure.net/secrets/refreshtoken?api-version=7.5",
+                    "connectVia": {
+                        "referenceName": "AutoResolveIntegrationRuntime",
+                        "type": "IntegrationRuntimeReference"
+                    },
+                    "authentication": {
+                        "type": "MSI",
+                        "resource": "https://vault.azure.net"
+                    }
+                }
+            },
+            {
+                "name": "Web2",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "Set variable1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "method": "GET",
+                    "url": "https://qbodatavault.vault.azure.net/secrets/clientsecret?api-version=7.5",
+                    "connectVia": {
+                        "referenceName": "AutoResolveIntegrationRuntime",
+                        "type": "IntegrationRuntimeReference"
+                    },
+                    "authentication": {
+                        "type": "MSI",
+                        "resource": "https://vault.azure.net"
+                    }
+                }
+            },
+            {
+                "name": "Set variable2",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Web2",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "ClientSecret",
+                    "value": {
+                        "value": "@activity('Web2').output.value",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Set variable3",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "clientId",
+                    "value": "<CLIENT ID>"
+                }
+            },
+            {
+                "name": "Lookup",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "If Condition1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": "Select * from STG.QBOMetaData where Isactive = 1;",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": "QBOMetaData"
+                        }
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "Copy IES API",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup').output.value",
+                        "type": "Expression"
+                    },
+                    "batchCount": 5,
+                    "activities": [
+                        {
+                            "name": "Copy IES Table",
+                            "type": "Copy",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "QuickBooksSource",
+                                    "additionalColumns": [
+                                        {
+                                            "name": "loaddate",
+                                            "value": {
+                                                "value": "@utcNow()",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "sink": {
+                                    "type": "AzureSqlSink",
+                                    "preCopyScript": {
+                                        "value": "@{concat('IF OBJECT_ID(''[STG].[', item().Query, ']'', ''U'') IS NOT NULL truncate TABLE [STG].[', item().Query, ']')\n}",
+                                        "type": "Expression"
+                                    },
+                                    "writeBehavior": "insert",
+                                    "sqlWriterUseTableLock": false,
+                                    "tableOption": "autoCreate",
+                                    "disableMetricsCollection": false
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "typeConversion": true,
+                                    "typeConversionSettings": {
+                                        "allowDataTruncation": true,
+                                        "treatBooleanAsNumber": false
+                                    }
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "IES_DATASET",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "qboTable": "@item().Table_Name"
+                                    }
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "QBO_Account",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "tableName": {
+                                            "value": "@item().Query",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Pull Trail Balance",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "Script1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "RestSource",
+                        "additionalColumns": [
+                            {
+                                "name": "loaddate",
+                                "value": {
+                                    "value": "@utcNow()",
+                                    "type": "Expression"
+                                }
+                            }
+                        ],
+                        "httpRequestTimeout": "00:01:40",
+                        "requestInterval": "00.00:00:00.010",
+                        "requestMethod": "GET",
+                        "additionalHeaders": {
+                            "Authorization": {
+                                "value": "@concat('Bearer ', activity('Web1').output.access_token)",
+                                "type": "Expression"
+                            }
+                        },
+                        "paginationRules": {
+                            "supportRFC5988": "true"
+                        }
+                    },
+                    "sink": {
+                        "type": "AzureSqlSink",
+                        "preCopyScript": "IF OBJECT_ID('[STG].[TrialBalance(IES)]', 'U') IS NOT NULL\n    truncate TABLE [STG].[TrialBalance(IES)]",
+                        "writeBehavior": "insert",
+                        "sqlWriterUseTableLock": false,
+                        "tableOption": "autoCreate",
+                        "disableMetricsCollection": false
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                            {
+                                "source": {
+                                    "path": "ColData[0].value"
+                                },
+                                "sink": {
+                                    "name": "AccountName",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[0].id"
+                                },
+                                "sink": {
+                                    "name": "AccountId",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[1].value"
+                                },
+                                "sink": {
+                                    "name": "DebitAmount",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[2].value"
+                                },
+                                "sink": {
+                                    "name": "CreditAmount",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "$['loaddate']"
+                                },
+                                "sink": {
+                                    "name": "loaddate",
+                                    "type": "DateTime"
+                                }
+                            }
+                        ],
+                        "collectionReference": "$['Rows']['Row']",
+                        "mapComplexValuesToString": true
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "QBOWebTrialBalance",
+                        "type": "DatasetReference"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": {
+                                "value": "@concat('TrialBalance', '(IES)')\n",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Pull AP Aging",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "Pull Trail Balance",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "RestSource",
+                        "additionalColumns": [
+                            {
+                                "name": "loaddate",
+                                "value": {
+                                    "value": "@utcNow()",
+                                    "type": "Expression"
+                                }
+                            }
+                        ],
+                        "httpRequestTimeout": "00:01:40",
+                        "requestInterval": "00.00:00:00.010",
+                        "requestMethod": "GET",
+                        "additionalHeaders": {
+                            "Authorization": {
+                                "value": "@concat('Bearer ', activity('Web1').output.access_token)",
+                                "type": "Expression"
+                            }
+                        },
+                        "paginationRules": {
+                            "supportRFC5988": "true"
+                        }
+                    },
+                    "sink": {
+                        "type": "AzureSqlSink",
+                        "preCopyScript": "IF OBJECT_ID('[STG].[ApAging(IES)]', 'U') IS NOT NULL\n    truncate TABLE [STG].[ApAging(IES)]",
+                        "writeBehavior": "insert",
+                        "sqlWriterUseTableLock": false,
+                        "tableOption": "autoCreate",
+                        "disableMetricsCollection": false
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                            {
+                                "source": {
+                                    "path": "ColData[0].value"
+                                },
+                                "sink": {
+                                    "name": "Date",
+                                    "type": "DateTime"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[1].value"
+                                },
+                                "sink": {
+                                    "name": "Transaction Type",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[2].value"
+                                },
+                                "sink": {
+                                    "name": "Num",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[3].value"
+                                },
+                                "sink": {
+                                    "name": "Vendor",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[4].value"
+                                },
+                                "sink": {
+                                    "name": "Location",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[5].value"
+                                },
+                                "sink": {
+                                    "name": "Due Date",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[6].value"
+                                },
+                                "sink": {
+                                    "name": "Past Due",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[7].value"
+                                },
+                                "sink": {
+                                    "name": "Amount",
+                                    "type": "Double"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[8].value"
+                                },
+                                "sink": {
+                                    "name": "Open Balance",
+                                    "type": "Double"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "$['loaddate']"
+                                },
+                                "sink": {
+                                    "name": "loaddate",
+                                    "type": "DateTime"
+                                }
+                            }
+                        ],
+                        "collectionReference": "$['Rows']['Row'][*]['Rows']['Row']",
+                        "mapComplexValuesToString": true
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "QBOWebApAging",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "thismonth": " "
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": {
+                                "value": "@concat('APAging', '(IES)')\n",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Pull AR Aging",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "AP Aging Last Month",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "RestSource",
+                        "additionalColumns": [
+                            {
+                                "name": "loaddate",
+                                "value": {
+                                    "value": "@utcNow()",
+                                    "type": "Expression"
+                                }
+                            }
+                        ],
+                        "httpRequestTimeout": "00:01:40",
+                        "requestInterval": "00.00:00:00.010",
+                        "requestMethod": "GET",
+                        "additionalHeaders": {
+                            "Authorization": {
+                                "value": "@concat('Bearer ', activity('Web1').output.access_token)",
+                                "type": "Expression"
+                            }
+                        },
+                        "paginationRules": {
+                            "supportRFC5988": "true"
+                        }
+                    },
+                    "sink": {
+                        "type": "AzureSqlSink",
+                        "preCopyScript": {
+                            "value": "IF OBJECT_ID('[STG].[ArAging(IES)]', 'U') IS NOT NULL\n    truncate TABLE [STG].[ArAging(IES)]\n",
+                            "type": "Expression"
+                        },
+                        "writeBehavior": "insert",
+                        "sqlWriterUseTableLock": false,
+                        "tableOption": "autoCreate",
+                        "disableMetricsCollection": false
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                            {
+                                "source": {
+                                    "path": "ColData[0].value"
+                                },
+                                "sink": {
+                                    "name": "Date",
+                                    "type": "Date"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[1].value"
+                                },
+                                "sink": {
+                                    "name": "Type",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[2].value"
+                                },
+                                "sink": {
+                                    "name": "Doc Num",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[3].value"
+                                },
+                                "sink": {
+                                    "name": "Customer",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[4].value"
+                                },
+                                "sink": {
+                                    "name": "Location",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[5].value"
+                                },
+                                "sink": {
+                                    "name": "Due Date\t",
+                                    "type": "Date"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[6].value"
+                                },
+                                "sink": {
+                                    "name": "SubTotal Amount",
+                                    "type": "Double"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[7].value"
+                                },
+                                "sink": {
+                                    "name": "Open Balance",
+                                    "type": "Double"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "$['loaddate']"
+                                },
+                                "sink": {
+                                    "name": "loaddate",
+                                    "type": "DateTime"
+                                }
+                            }
+                        ],
+                        "collectionReference": "$['Rows']['Row'][*]['Rows']['Row']",
+                        "mapComplexValuesToString": true
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "QBOWebARAging",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "thismonth": " "
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": {
+                                "value": "@concat('ArAging', '(IES)')\n",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Execute Pipeline1_copy1",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    {
+                        "activity": "Pull AR Aging Last Month",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "TransactionSplit V3 PROD",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                        "months": 3
+                    }
+                }
+            },
+            {
+                "name": "Script1",
+                "type": "Script",
+                "dependsOn": [
+                    {
+                        "activity": "Copy data1_copy1",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "linkedServiceName": {
+                    "referenceName": "EDW",
+                    "type": "LinkedServiceReference"
+                },
+                "typeProperties": {
+                    "scripts": [
+                        {
+                            "type": "Query",
+                            "text": "WITH RankedInvoices AS (\n    SELECT *,\n           ROW_NUMBER() OVER (\n               PARTITION BY id ,docnumber\n               ORDER BY loaddate DESC\n           ) AS rn\n    FROM stg.[Invoice(IES)]\n)\nDELETE FROM RankedInvoices\nWHERE rn > 1;\n\n WITH RankedInvoicesline AS (\n    SELECT *,\n           ROW_NUMBER() OVER (\n               PARTITION BY id ,[Line_Id]\n               ORDER BY loaddate DESC\n           ) AS rn\n    FROM [Stg].[Invoice_Sales_Item_Line(IES)]\n)\nDELETE FROM RankedInvoicesline\nWHERE rn > 1;\n"
+                        }
+                    ],
+                    "scriptBlockExecutionTimeout": "02:00:00"
+                }
+            },
+            {
+                "name": "Execute Pipeline2",
+                "type": "ExecutePipeline",
+                "state": "Inactive",
+                "onInactiveMarkAs": "Succeeded",
+                "dependsOn": [
+                    {
+                        "activity": "Execute Pipeline1_copy1",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "Bills Custom Fields PROD",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true
+                }
+            },
+            {
+                "name": "AP Aging Last Month",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "Pull AP Aging",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "RestSource",
+                        "additionalColumns": [
+                            {
+                                "name": "loaddate",
+                                "value": {
+                                    "value": "@utcNow()",
+                                    "type": "Expression"
+                                }
+                            },
+                            {
+                                "name": "AsOfDate",
+                                "value": {
+                                    "value": "@formatDateTime(addDays(startOfMonth(utcNow()),-1), 'yyyy-MM-dd')",
+                                    "type": "Expression"
+                                }
+                            }
+                        ],
+                        "httpRequestTimeout": "01:00:40",
+                        "requestInterval": "00.00:00:00.010",
+                        "requestMethod": "GET",
+                        "additionalHeaders": {
+                            "Authorization": {
+                                "value": "@concat('Bearer ', activity('Web1').output.access_token)",
+                                "type": "Expression"
+                            }
+                        },
+                        "paginationRules": {
+                            "supportRFC5988": "true"
+                        }
+                    },
+                    "sink": {
+                        "type": "AzureSqlSink",
+                        "preCopyScript": {
+                            "value": "@concat('delete from [STG].[ApAgingHistory(IES)] where AsOfDate = ''',formatDateTime(addDays(startOfMonth(utcNow()),-1), 'yyyy-MM-dd'), '''')",
+                            "type": "Expression"
+                        },
+                        "writeBehavior": "insert",
+                        "sqlWriterUseTableLock": false,
+                        "disableMetricsCollection": false
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                            {
+                                "source": {
+                                    "path": "ColData[0].value"
+                                },
+                                "sink": {
+                                    "name": "Date"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[1].value"
+                                },
+                                "sink": {
+                                    "name": "Transaction Type"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[2].value"
+                                },
+                                "sink": {
+                                    "name": "Num"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[3].value"
+                                },
+                                "sink": {
+                                    "name": "Vendor"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[4].value"
+                                },
+                                "sink": {
+                                    "name": "Location"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[5].value"
+                                },
+                                "sink": {
+                                    "name": "Due Date"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[6].value"
+                                },
+                                "sink": {
+                                    "name": "Past Due"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[7].value"
+                                },
+                                "sink": {
+                                    "name": "Amount"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[8].value"
+                                },
+                                "sink": {
+                                    "name": "Open Balance"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "$['loaddate']"
+                                },
+                                "sink": {
+                                    "name": "loaddate"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "$['AsOfDate']"
+                                },
+                                "sink": {
+                                    "name": "AsOfDate"
+                                }
+                            }
+                        ],
+                        "collectionReference": "$['Rows']['Row'][*]['Rows']['Row']",
+                        "mapComplexValuesToString": true
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "QBOWebApAging",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "thismonth": {
+                                "value": "@concat('report_date=',addDays(startOfMonth(utcNow()),-1))",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": "APAgingHistory(IES)"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Pull AR Aging Last Month",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "Pull AR Aging",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "RestSource",
+                        "additionalColumns": [
+                            {
+                                "name": "loaddate",
+                                "value": {
+                                    "value": "@utcNow()",
+                                    "type": "Expression"
+                                }
+                            },
+                            {
+                                "name": "AsOfDate",
+                                "value": {
+                                    "value": "@formatDateTime(addDays(startOfMonth(utcNow()),-1), 'yyyy-MM-dd')",
+                                    "type": "Expression"
+                                }
+                            }
+                        ],
+                        "httpRequestTimeout": "00:01:40",
+                        "requestInterval": "00.00:00:00.010",
+                        "requestMethod": "GET",
+                        "additionalHeaders": {
+                            "Authorization": {
+                                "value": "@concat('Bearer ', activity('Web1').output.access_token)",
+                                "type": "Expression"
+                            }
+                        },
+                        "paginationRules": {
+                            "supportRFC5988": "true"
+                        }
+                    },
+                    "sink": {
+                        "type": "AzureSqlSink",
+                        "preCopyScript": {
+                            "value": "@concat('delete from [STG].[ArAgingHistory(IES)] where AsOfDate = ''',formatDateTime(addDays(startOfMonth(utcNow()),-1), 'yyyy-MM-dd'),'''')",
+                            "type": "Expression"
+                        },
+                        "writeBehavior": "insert",
+                        "sqlWriterUseTableLock": false,
+                        "disableMetricsCollection": false
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                            {
+                                "source": {
+                                    "path": "ColData[0].value"
+                                },
+                                "sink": {
+                                    "name": "Date",
+                                    "type": "Date"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[1].value"
+                                },
+                                "sink": {
+                                    "name": "Type",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[2].value"
+                                },
+                                "sink": {
+                                    "name": "Doc Num",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[3].value"
+                                },
+                                "sink": {
+                                    "name": "Customer",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[4].value"
+                                },
+                                "sink": {
+                                    "name": "Location",
+                                    "type": "String"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[5].value"
+                                },
+                                "sink": {
+                                    "name": "Due Date\t",
+                                    "type": "Date"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[6].value"
+                                },
+                                "sink": {
+                                    "name": "SubTotal Amount",
+                                    "type": "Double"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "ColData[7].value"
+                                },
+                                "sink": {
+                                    "name": "Open Balance",
+                                    "type": "Double"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "$['loaddate']"
+                                },
+                                "sink": {
+                                    "name": "loaddate",
+                                    "type": "DateTime"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "path": "$['AsOfDate']"
+                                },
+                                "sink": {
+                                    "name": "AsOfDate"
+                                }
+                            }
+                        ],
+                        "collectionReference": "$['Rows']['Row'][*]['Rows']['Row']",
+                        "mapComplexValuesToString": true
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "QBOWebARAging",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "thismonth": "@concat('report_date=',addDays(startOfMonth(utcNow()),-1))"
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": {
+                                "value": "@concat('ArAgingHistory', '(IES)')\n",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "If Condition1",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "Web1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(activity('Web1').output.refresh_token, variables('refreshtoken'))",
+                        "type": "Expression"
+                    },
+                    "ifFalseActivities": [
+                        {
+                            "name": "Web3_copy1",
+                            "type": "WebActivity",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "method": "PUT",
+                                "headers": {
+                                    "Content-Type": "application/json"
+                                },
+                                "url": "https://qbodatavault.vault.azure.net/secrets/refreshtoken?api-version=7.5",
+                                "connectVia": {
+                                    "referenceName": "AutoResolveIntegrationRuntime",
+                                    "type": "IntegrationRuntimeReference"
+                                },
+                                "body": {
+                                    "value": "@json(concat('{ \"value\": \"', activity('Web1').output.refresh_token, '\" }'))\n",
+                                    "type": "Expression"
+                                },
+                                "authentication": {
+                                    "type": "MSI",
+                                    "resource": "https://vault.azure.net/"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Copy data1",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "Copy IES API",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "QuickBooksSource",
+                        "additionalColumns": [
+                            {
+                                "name": "loaddate",
+                                "value": {
+                                    "value": "@utcNow()",
+                                    "type": "Expression"
+                                }
+                            }
+                        ],
+                        "query": "select * from Item where Active = false"
+                    },
+                    "sink": {
+                        "type": "AzureSqlSink",
+                        "writeBehavior": "upsert",
+                        "upsertSettings": {
+                            "useTempDB": true,
+                            "keys": [
+                                "Id"
+                            ]
+                        },
+                        "sqlWriterUseTableLock": false,
+                        "disableMetricsCollection": false
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                            {
+                                "source": {
+                                    "name": "Name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Sku",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Sku",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Description",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Description",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Active",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "Active",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SubItem",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "SubItem",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ParentRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ParentRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ParentRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ParentRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ParentRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ParentRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Level",
+                                    "type": "Int32"
+                                },
+                                "sink": {
+                                    "name": "Level",
+                                    "type": "Int32",
+                                    "physicalType": "int"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "FullyQualifiedName",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "FullyQualifiedName",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Taxable",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "Taxable",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SalesTaxIncluded",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "SalesTaxIncluded",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PercentBased",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "PercentBased",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "UnitPrice",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "UnitPrice",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "RatePercent",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "RatePercent",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PaymentMethodRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PaymentMethodRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PaymentMethodRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PaymentMethodRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PaymentMethodRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PaymentMethodRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "UOMSetRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "UOMSetRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "UOMSetRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "UOMSetRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "UOMSetRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "UOMSetRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "IncomeAccountRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "IncomeAccountRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "IncomeAccountRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "IncomeAccountRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "IncomeAccountRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "IncomeAccountRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PurchaseDesc",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PurchaseDesc",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PurchaseTaxIncluded",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "PurchaseTaxIncluded",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PurchaseCost",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "PurchaseCost",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ExpenseAccountRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ExpenseAccountRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ExpenseAccountRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ExpenseAccountRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ExpenseAccountRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ExpenseAccountRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "COGSAccountRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "COGSAccountRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "COGSAccountRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "COGSAccountRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "COGSAccountRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "COGSAccountRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AssetAccountRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AssetAccountRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AssetAccountRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AssetAccountRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AssetAccountRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AssetAccountRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PrefVendorRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PrefVendorRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PrefVendorRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PrefVendorRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PrefVendorRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PrefVendorRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AvgCost",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "AvgCost",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TrackQtyOnHand",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "TrackQtyOnHand",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "QtyOnHand",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "QtyOnHand",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "QtyOnPurchaseOrder",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "QtyOnPurchaseOrder",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "QtyOnSalesOrder",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "QtyOnSalesOrder",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ReorderPoint",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "ReorderPoint",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ManPartNum",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ManPartNum",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "DepositToAccountRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "DepositToAccountRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "DepositToAccountRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "DepositToAccountRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "DepositToAccountRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "DepositToAccountRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SalesTaxCodeRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "SalesTaxCodeRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SalesTaxCodeRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "SalesTaxCodeRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SalesTaxCodeRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "SalesTaxCodeRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PurchaseTaxCodeRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PurchaseTaxCodeRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PurchaseTaxCodeRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PurchaseTaxCodeRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PurchaseTaxCodeRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "PurchaseTaxCodeRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "InvStartDate",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "InvStartDate",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "BuildPoint",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "BuildPoint",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "PrintGroupedItems",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "PrintGroupedItems",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SpecialItem",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "SpecialItem",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SpecialItemType",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "SpecialItemType",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AbatementRate",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "AbatementRate",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ReverseChargeRate",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "ReverseChargeRate",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ServiceType",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ServiceType",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ItemCategoryType",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ItemCategoryType",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TaxClassificationRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "TaxClassificationRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TaxClassificationRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "TaxClassificationRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TaxClassificationRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "TaxClassificationRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "UQCDisplayText",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "UQCDisplayText",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "UQCId",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "UQCId",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ClassRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ClassRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ClassRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ClassRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ClassRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ClassRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Source",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Source",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "DeferredRevenue",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "DeferredRevenue",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Id",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Id",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SyncToken",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "SyncToken",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreatedByRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreatedByRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreatedByRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreatedByRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreatedByRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreatedByRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreateTime",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreateTime",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastModifiedByRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastModifiedByRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastModifiedByRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastModifiedByRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastModifiedByRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastModifiedByRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastUpdatedTime",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastUpdatedTime",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastChangedInQB",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastChangedInQB",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_Synchronized",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "MetaData_Synchronized",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "domain",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "domain",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "status",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "status",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "sparse",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "sparse",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "NameAndId",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "NameAndId",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Overview",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Overview",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "HeaderLite",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "HeaderLite",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "HeaderFull",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "HeaderFull",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "loaddate",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "loaddate",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            }
+                        ],
+                        "typeConversion": true,
+                        "typeConversionSettings": {
+                            "allowDataTruncation": true,
+                            "treatBooleanAsNumber": false
+                        }
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "IES_DATASET",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "qboTable": " "
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": "Item(IES)"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Copy data1_copy1",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "Copy data1",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "QuickBooksSource",
+                        "additionalColumns": [
+                            {
+                                "name": "loaddate",
+                                "value": {
+                                    "value": "@utcNow()",
+                                    "type": "Expression"
+                                }
+                            }
+                        ],
+                        "query": "select * from Account where Active = false"
+                    },
+                    "sink": {
+                        "type": "AzureSqlSink",
+                        "writeBehavior": "upsert",
+                        "upsertSettings": {
+                            "useTempDB": true,
+                            "keys": [
+                                "Id"
+                            ]
+                        },
+                        "sqlWriterUseTableLock": false,
+                        "disableMetricsCollection": false
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                            {
+                                "source": {
+                                    "name": "Name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SubAccount",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "SubAccount",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ParentRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ParentRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ParentRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ParentRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "ParentRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "ParentRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Description",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Description",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "FullyQualifiedName",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "FullyQualifiedName",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AccountAlias",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AccountAlias",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TxnLocationType",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "TxnLocationType",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Active",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "Active",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Classification",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Classification",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AccountType",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AccountType",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AccountSubType",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AccountSubType",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AcctNum",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AcctNum",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "AcctNumExtn",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "AcctNumExtn",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "BankNum",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "BankNum",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "OpeningBalance",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "OpeningBalance",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "OpeningBalanceDate",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "OpeningBalanceDate",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "CurrentBalance",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "CurrentBalance",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "CurrentBalanceWithSubAccounts",
+                                    "type": "Decimal"
+                                },
+                                "sink": {
+                                    "name": "CurrentBalanceWithSubAccounts",
+                                    "type": "Decimal",
+                                    "physicalType": "decimal",
+                                    "scale": 2,
+                                    "precision": 15
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "CurrencyRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "CurrencyRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "CurrencyRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "CurrencyRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "CurrencyRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "CurrencyRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TaxAccount",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "TaxAccount",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TaxCodeRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "TaxCodeRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TaxCodeRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "TaxCodeRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "TaxCodeRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "TaxCodeRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "OnlineBankingEnabled",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "OnlineBankingEnabled",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "FIName",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "FIName",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "JournalCodeRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "JournalCodeRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "JournalCodeRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "JournalCodeRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "JournalCodeRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "JournalCodeRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Id",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Id",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "SyncToken",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "SyncToken",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreatedByRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreatedByRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreatedByRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreatedByRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreatedByRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreatedByRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_CreateTime",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "MetaData_CreateTime",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastModifiedByRef_name",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastModifiedByRef_name",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastModifiedByRef_type",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastModifiedByRef_type",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastModifiedByRef_Value",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastModifiedByRef_Value",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastUpdatedTime",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastUpdatedTime",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_LastChangedInQB",
+                                    "type": "DateTime"
+                                },
+                                "sink": {
+                                    "name": "MetaData_LastChangedInQB",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "MetaData_Synchronized",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "MetaData_Synchronized",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "domain",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "domain",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "status",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "status",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "sparse",
+                                    "type": "Boolean"
+                                },
+                                "sink": {
+                                    "name": "sparse",
+                                    "type": "Boolean",
+                                    "physicalType": "bit"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "NameAndId",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "NameAndId",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "Overview",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "Overview",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "HeaderLite",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "HeaderLite",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "HeaderFull",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "HeaderFull",
+                                    "type": "String",
+                                    "physicalType": "nvarchar"
+                                }
+                            },
+                            {
+                                "source": {
+                                    "name": "loaddate",
+                                    "type": "String"
+                                },
+                                "sink": {
+                                    "name": "loaddate",
+                                    "type": "DateTime",
+                                    "physicalType": "datetime2"
+                                }
+                            }
+                        ],
+                        "typeConversion": true,
+                        "typeConversionSettings": {
+                            "allowDataTruncation": true,
+                            "treatBooleanAsNumber": false
+                        }
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "IES_DATASET",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "qboTable": " "
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "QBO_Account",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": "Account(IES)"
+                        }
+                    }
+                ]
+            }
+        ],
+        "variables": {
+            "tableNames": {
+                "type": "String"
+            },
+            "tableName2": {
+                "type": "Array"
+            },
+            "clientId": {
+                "type": "String"
+            },
+            "ClientSecret": {
+                "type": "String"
+            },
+            "refreshtoken": {
+                "type": "String"
+            },
+            "accessToken": {
+                "type": "String"
+            },
+            "start": {
+                "type": "Integer"
+            },
+            "rowcount": {
+                "type": "Integer"
+            },
+            "temp": {
+                "type": "Integer"
+            }
+        },
+        "folder": {
+            "name": "QBO"
+        },
+        "annotations": []
+    }
+}

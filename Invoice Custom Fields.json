@@ -1,0 +1,691 @@
+{
+    "name": "Invoice Custom Fields",
+    "properties": {
+        "activities": [
+            {
+                "name": "Get New Refresh Token",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "Set Client Secret",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "method": "POST",
+                    "headers": {
+                        "Authorization": {
+                            "value": "Basic @{base64(concat(variables('clientId'), ':', variables('ClientSecret')))}\n",
+                            "type": "Expression"
+                        },
+                        "Content-type": "application/x-www-form-urlencoded"
+                    },
+                    "linkedServices": [
+                        {
+                            "referenceName": "QBOkey",
+                            "type": "LinkedServiceReference"
+                        }
+                    ],
+                    "url": "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+                    "connectVia": {
+                        "referenceName": "AutoResolveIntegrationRuntime",
+                        "type": "IntegrationRuntimeReference"
+                    },
+                    "body": {
+                        "value": "@concat('grant_type=refresh_token&refresh_token=', activity('Get Refresh Token').output.value)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Set Refresh Token",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Get Refresh Token",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "refreshtoken",
+                    "value": {
+                        "value": "@activity('Get Refresh Token').output.value",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Get Refresh Token",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "Set Client ID",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "method": "GET",
+                    "url": "https://qbodatavault.vault.azure.net/secrets/refreshtoken?api-version=7.5",
+                    "connectVia": {
+                        "referenceName": "AutoResolveIntegrationRuntime",
+                        "type": "IntegrationRuntimeReference"
+                    },
+                    "authentication": {
+                        "type": "MSI",
+                        "resource": "https://vault.azure.net"
+                    }
+                }
+            },
+            {
+                "name": "Get Client Secret",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "Set Refresh Token",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "method": "GET",
+                    "url": "https://qbodatavault.vault.azure.net/secrets/clientsecret?api-version=7.5",
+                    "connectVia": {
+                        "referenceName": "AutoResolveIntegrationRuntime",
+                        "type": "IntegrationRuntimeReference"
+                    },
+                    "authentication": {
+                        "type": "MSI",
+                        "resource": "https://vault.azure.net"
+                    }
+                }
+            },
+            {
+                "name": "Set Client Secret",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Get Client Secret",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "ClientSecret",
+                    "value": {
+                        "value": "@activity('Get Client Secret').output.value",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Set Client ID",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "clientId",
+                    "value": "<CLIENT ID>"
+                }
+            },
+            {
+                "name": "If Condition1",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "Get New Refresh Token",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(activity('Get New Refresh Token').output.refresh_token, variables('refreshtoken'))",
+                        "type": "Expression"
+                    },
+                    "ifFalseActivities": [
+                        {
+                            "name": "Web3_copy1",
+                            "type": "WebActivity",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "method": "PUT",
+                                "headers": {
+                                    "Content-Type": "application/json"
+                                },
+                                "url": "https://qbodatavault.vault.azure.net/secrets/refreshtoken?api-version=7.5",
+                                "connectVia": {
+                                    "referenceName": "AutoResolveIntegrationRuntime",
+                                    "type": "IntegrationRuntimeReference"
+                                },
+                                "body": {
+                                    "value": "@json(concat('{ \"value\": \"', activity('Get New Refresh Token').output.refresh_token, '\" }'))\n",
+                                    "type": "Expression"
+                                },
+                                "authentication": {
+                                    "type": "MSI",
+                                    "resource": "https://vault.azure.net/"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Lookup Invoices",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "If Condition1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": {
+                            "value": "@concat('SELECT Id\nFROM [Stg].[Invoice(IES)]\nwhere CAST(MetaData_LastUpdatedTime AS date)  > ''', addDays(utcNow(), -2, 'yyyy-MM-dd'), '''')",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "IES_DEV_DB",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "tableName": "Invoice(IESV2)"
+                        }
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "For each Invoice",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup Invoices",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup Invoices').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": false,
+                    "batchCount": 5,
+                    "activities": [
+                        {
+                            "name": "Copy data",
+                            "type": "Copy",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "RestSource",
+                                    "additionalColumns": [
+                                        {
+                                            "name": "loaddate",
+                                            "value": {
+                                                "value": "@utcNow()",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    ],
+                                    "httpRequestTimeout": "01:01:40",
+                                    "requestInterval": "00.00:00:00.010",
+                                    "requestMethod": "GET",
+                                    "additionalHeaders": {
+                                        "Authorization": {
+                                            "value": "@concat('Bearer ', activity('Get New Refresh Token').output.access_token)",
+                                            "type": "Expression"
+                                        }
+                                    },
+                                    "paginationRules": {
+                                        "supportRFC5988": "true"
+                                    }
+                                },
+                                "sink": {
+                                    "type": "AzureSqlSink",
+                                    "writeBehavior": "upsert",
+                                    "upsertSettings": {
+                                        "useTempDB": true,
+                                        "keys": [
+                                            "Id",
+                                            "DefinitionId"
+                                        ]
+                                    },
+                                    "sqlWriterUseTableLock": false,
+                                    "tableOption": "autoCreate",
+                                    "disableMetricsCollection": false
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "mappings": [
+                                        {
+                                            "source": {
+                                                "path": "$['Invoice']['Id']"
+                                            },
+                                            "sink": {
+                                                "name": "Id",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['DefinitionId']"
+                                            },
+                                            "sink": {
+                                                "name": "DefinitionId",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['Name']"
+                                            },
+                                            "sink": {
+                                                "name": "Name",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['Type']"
+                                            },
+                                            "sink": {
+                                                "name": "Type",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['StringValue']"
+                                            },
+                                            "sink": {
+                                                "name": "StringValue",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "$['loaddate']"
+                                            },
+                                            "sink": {
+                                                "name": "loaddate",
+                                                "type": "DateTime"
+                                            }
+                                        }
+                                    ],
+                                    "collectionReference": "$['Invoice']['CustomField']",
+                                    "mapComplexValuesToString": false
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "customfieldIESAPI",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "tablename": "invoice",
+                                        "id": {
+                                            "value": "@item().Id",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "IES_DEV_DB",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "tableName": "InvoiceCustomFieldRef(IES)"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Copy data_copy1",
+                            "type": "Copy",
+                            "dependsOn": [
+                                {
+                                    "activity": "Save new token",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "RestSource",
+                                    "additionalColumns": [
+                                        {
+                                            "name": "loaddate",
+                                            "value": {
+                                                "value": "@utcNow()",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    ],
+                                    "httpRequestTimeout": "01:01:40",
+                                    "requestInterval": "00.00:00:00.010",
+                                    "requestMethod": "GET",
+                                    "additionalHeaders": {
+                                        "Authorization": {
+                                            "value": "@concat('Bearer ', activity('Get New Refresh Token').output.access_token)",
+                                            "type": "Expression"
+                                        }
+                                    },
+                                    "paginationRules": {
+                                        "supportRFC5988": "true"
+                                    }
+                                },
+                                "sink": {
+                                    "type": "AzureSqlSink",
+                                    "writeBehavior": "upsert",
+                                    "upsertSettings": {
+                                        "useTempDB": true,
+                                        "keys": [
+                                            "Id",
+                                            "DefinitionId"
+                                        ]
+                                    },
+                                    "sqlWriterUseTableLock": false,
+                                    "tableOption": "autoCreate",
+                                    "disableMetricsCollection": false
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "mappings": [
+                                        {
+                                            "source": {
+                                                "path": "$['Invoice']['Id']"
+                                            },
+                                            "sink": {
+                                                "name": "Id",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['DefinitionId']"
+                                            },
+                                            "sink": {
+                                                "name": "DefinitionId",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['Name']"
+                                            },
+                                            "sink": {
+                                                "name": "Name",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['Type']"
+                                            },
+                                            "sink": {
+                                                "name": "Type",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "['StringValue']"
+                                            },
+                                            "sink": {
+                                                "name": "StringValue",
+                                                "type": "String"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "path": "$['loaddate']"
+                                            },
+                                            "sink": {
+                                                "name": "loaddate",
+                                                "type": "DateTime"
+                                            }
+                                        }
+                                    ],
+                                    "collectionReference": "$['Invoice']['CustomField']",
+                                    "mapComplexValuesToString": false
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "customfieldIESAPI",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "tablename": "invoice",
+                                        "id": {
+                                            "value": "@item().Id",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "IES_DEV_DB",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "tableName": "InvoiceCustomFieldRef(IES)"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get New Refresh Token_copy1",
+                            "type": "WebActivity",
+                            "dependsOn": [
+                                {
+                                    "activity": "Copy data",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "method": "POST",
+                                "headers": {
+                                    "Authorization": {
+                                        "value": "Basic @{base64(concat(variables('clientId'), ':', variables('ClientSecret')))}\n",
+                                        "type": "Expression"
+                                    },
+                                    "Content-type": "application/x-www-form-urlencoded"
+                                },
+                                "linkedServices": [
+                                    {
+                                        "referenceName": "QBOkey",
+                                        "type": "LinkedServiceReference"
+                                    }
+                                ],
+                                "url": "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+                                "connectVia": {
+                                    "referenceName": "AutoResolveIntegrationRuntime",
+                                    "type": "IntegrationRuntimeReference"
+                                },
+                                "body": {
+                                    "value": "@concat('grant_type=refresh_token&refresh_token=', activity('Get Refresh Token').output.value)",
+                                    "type": "Expression"
+                                }
+                            }
+                        },
+                        {
+                            "name": "Save new token",
+                            "type": "WebActivity",
+                            "dependsOn": [
+                                {
+                                    "activity": "Get New Refresh Token_copy1",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "method": "PUT",
+                                "headers": {
+                                    "Content-Type": "application/json"
+                                },
+                                "url": "https://qbodatavault.vault.azure.net/secrets/refreshtoken?api-version=7.5",
+                                "connectVia": {
+                                    "referenceName": "AutoResolveIntegrationRuntime",
+                                    "type": "IntegrationRuntimeReference"
+                                },
+                                "body": {
+                                    "value": "@json(concat('{ \"value\": \"', activity('Get New Refresh Token_copy1').output.refresh_token, '\" }'))\n",
+                                    "type": "Expression"
+                                },
+                                "authentication": {
+                                    "type": "MSI",
+                                    "resource": "https://vault.azure.net/"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "variables": {
+            "tableNames": {
+                "type": "String"
+            },
+            "tableName2": {
+                "type": "Array"
+            },
+            "clientId": {
+                "type": "String"
+            },
+            "ClientSecret": {
+                "type": "String"
+            },
+            "refreshtoken": {
+                "type": "String"
+            },
+            "accessToken": {
+                "type": "String"
+            },
+            "start": {
+                "type": "Integer"
+            },
+            "rowcount": {
+                "type": "Integer"
+            },
+            "temp": {
+                "type": "Integer"
+            }
+        },
+        "folder": {
+            "name": "QBODev"
+        },
+        "annotations": []
+    }
+}
